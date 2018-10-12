@@ -3,6 +3,7 @@
 
 use alloc::vec::Vec;
 use core::fmt::{Debug, Error, Formatter};
+use core::marker::PhantomData;
 use super::*;
 use paging::*;
 
@@ -48,8 +49,10 @@ pub trait InactivePageTable {
     **  @retval usize                the token of the inactive page table
     */
     fn token(&self) -> usize;
+}
 
-    /// Why the methods below are in this trait?
+/// Allocte service provided by kernel
+pub trait KernelAllocator{
     /*
     **  @brief  allocate a frame for use
     **  @retval Option<PhysAddr>     the physics address of the beginning of allocated frame, if present
@@ -161,7 +164,7 @@ impl MemoryArea {
     **  @param  pt: &mut T::Active   the page table to use
     **  @retval none
     */
-    fn map<T: InactivePageTable>(&self, pt: &mut T::Active) {
+    fn map<T: InactivePageTable,A: KernelAllocator>(&self, pt: &mut T::Active) {
         match self.phys_start_addr {
             Some(phys_start) => {
                 for page in Page::range_of(self.start_addr, self.end_addr) {
@@ -173,7 +176,7 @@ impl MemoryArea {
             None => {
                 for page in Page::range_of(self.start_addr, self.end_addr) {
                     let addr = page.start_address();
-                    let target = T::alloc_frame().expect("failed to allocate frame");
+                    let target = A::alloc_frame().expect("failed to allocate frame");
                     self.flags.apply(pt.map(addr, target));
                 }
             }
@@ -184,12 +187,12 @@ impl MemoryArea {
     **  @param  pt: &mut T::Active   the page table to use
     **  @retval none
     */
-    fn unmap<T: InactivePageTable>(&self, pt: &mut T::Active) {
+    fn unmap<T: InactivePageTable,A: KernelAllocator>(&self, pt: &mut T::Active) {
         for page in Page::range_of(self.start_addr, self.end_addr) {
             let addr = page.start_address();
             if self.phys_start_addr.is_none() {
                 let target = pt.get_entry(addr).target();
-                T::dealloc_frame(target);
+                A::dealloc_frame(target);
             }
             pt.unmap(addr);
         }
@@ -255,13 +258,14 @@ impl MemoryAttr {
 
 /// set of memory space with multiple memory area with associated page table and stack space
 /// like `mm_struct` in ucore
-pub struct MemorySet<T: InactivePageTable> {
+pub struct MemorySet<T: InactivePageTable,A: KernelAllocator + 'static> {
     areas: Vec<MemoryArea>,
     page_table: T,
     kstack: Stack,
+    phantom: PhantomData<&'static A>,
 }
 
-impl<T: InactivePageTable> MemorySet<T> {
+impl<T: InactivePageTable,A: KernelAllocator> MemorySet<T,A> {
     /*
     **  @brief  create a memory set
     **  @retval MemorySet<T>         the memory set created
@@ -270,7 +274,8 @@ impl<T: InactivePageTable> MemorySet<T> {
         MemorySet {
             areas: Vec::<MemoryArea>::new(),
             page_table: T::new(),
-            kstack: T::alloc_stack(),
+            kstack: A::alloc_stack(),
+            phantom: PhantomData,
         }
     }
     /*
@@ -287,6 +292,7 @@ impl<T: InactivePageTable> MemorySet<T> {
             areas: Vec::<MemoryArea>::from_raw_parts(slice.as_ptr() as *mut MemoryArea, 0, cap),
             page_table: T::new_bare(),
             kstack,
+            phantom: PhantomData,
         }
     }
     /*
@@ -306,7 +312,7 @@ impl<T: InactivePageTable> MemorySet<T> {
         assert!(self.areas.iter()
                     .find(|other| area.is_overlap_with(other))
                     .is_none(), "memory area overlap");
-        self.page_table.edit(|pt| area.map::<T>(pt));
+        self.page_table.edit(|pt| area.map::<T,A>(pt));
         self.areas.push(area);
     }
     /*
@@ -354,36 +360,37 @@ impl<T: InactivePageTable> MemorySet<T> {
         let Self { ref mut page_table, ref mut areas, .. } = self;
         page_table.edit(|pt| {
             for area in areas.iter() {
-                area.unmap::<T>(pt);
+                area.unmap::<T,A>(pt);
             }
         });
         areas.clear();
     }
 }
 
-impl<T: InactivePageTable> Clone for MemorySet<T> {
+impl<T: InactivePageTable,A: KernelAllocator> Clone for MemorySet<T,A> {
     fn clone(&self) -> Self {
         let mut page_table = T::new();
         page_table.edit(|pt| {
             for area in self.areas.iter() {
-                area.map::<T>(pt);
+                area.map::<T,A>(pt);
             }
         });
         MemorySet {
             areas: self.areas.clone(),
             page_table,
-            kstack: T::alloc_stack(),
+            kstack: A::alloc_stack(),
+            phantom: PhantomData,
         }
     }
 }
 
-impl<T: InactivePageTable> Drop for MemorySet<T> {
+impl<T: InactivePageTable,A: KernelAllocator> Drop for MemorySet<T,A> {
     fn drop(&mut self) {
         self.clear();
     }
 }
 
-impl<T: InactivePageTable> Debug for MemorySet<T> {
+impl<T: InactivePageTable,A: KernelAllocator> Debug for MemorySet<T,A> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         f.debug_list()
             .entries(self.areas.iter())

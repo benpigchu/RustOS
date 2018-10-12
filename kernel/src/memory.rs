@@ -5,9 +5,9 @@ use spin::{Mutex, MutexGuard};
 use super::HEAP_ALLOCATOR;
 use ucore_memory::{*, paging::PageTable};
 use ucore_memory::cow::CowExt;
-pub use ucore_memory::memory_set::{MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack};
+pub use ucore_memory::memory_set::{KernelAllocator,MemoryArea, MemoryAttr, MemorySet as MemorySet_, Stack};
 
-pub type MemorySet = MemorySet_<InactivePageTable0>;
+pub type MemorySet = MemorySet_<InactivePageTable0,KernelAllocatorService>;
 
 // x86_64 support up to 256M memory
 #[cfg(target_arch = "x86_64")]
@@ -64,6 +64,22 @@ pub fn init_heap() {
     static mut HEAP: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
     unsafe { HEAP_ALLOCATOR.lock().init(HEAP.as_ptr() as usize, KERNEL_HEAP_SIZE); }
     info!("heap init end");
+}
+
+pub struct KernelAllocatorService{}
+
+impl KernelAllocator for KernelAllocatorService{
+    fn alloc_frame() -> Option<usize> {
+        alloc_frame()
+    }
+
+    fn dealloc_frame(target: usize) {
+        dealloc_frame(target)
+    }
+
+    fn alloc_stack() -> Stack {
+        alloc_stack()
+    }
 }
 
 //pub mod test {

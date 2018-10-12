@@ -14,7 +14,7 @@ use ucore_memory::paging::*;
 * @param:
 *   Frame: page table root frame
 * @brief:
-*   setup page table in the frame 
+*   setup page table in the frame
 */
 // need 1 page
 pub fn setup_page_table(frame: Frame) {
@@ -43,12 +43,12 @@ impl PageTable for ActivePageTable {
     type Entry = PageEntry;
 
     /*
-    * @param: 
+    * @param:
     *   addr: the virtual addr to be matched
     *   target: the physical addr to be matched with addr
-    * @brief: 
+    * @brief:
     *   map the virtual address 'addr' to the physical address 'target' in pagetable.
-    * @retval: 
+    * @retval:
     *   the matched PageEntry
     */
     fn map(&mut self, addr: usize, target: usize) -> &mut PageEntry {
@@ -64,9 +64,9 @@ impl PageTable for ActivePageTable {
     }
 
     /*
-    * @param: 
+    * @param:
     *   addr: virtual address of which the mapped physical frame should be unmapped
-    * @bridf: 
+    * @bridf:
     ^   unmap the virtual addresses' mapped physical frame
     */
     fn unmap(&mut self, addr: usize) {
@@ -76,11 +76,11 @@ impl PageTable for ActivePageTable {
     }
 
     /*
-    * @param: 
+    * @param:
     *   addr:input virtual address
-    * @brief: 
+    * @brief:
     *   get the pageEntry of 'addr'
-    * @retval: 
+    * @retval:
     *   a mutable PageEntry reference of 'addr'
     */
     fn get_entry(&mut self, addr: usize) -> &mut PageEntry {
@@ -92,12 +92,12 @@ impl PageTable for ActivePageTable {
     }
 
     /*
-    * @param: 
+    * @param:
     *   addr:the input (virutal) address
-    * @brief: 
-    *   get the addr's memory page slice 
-    * @retval: 
-    *   a mutable reference slice of 'addr' 's page  
+    * @brief:
+    *   get the addr's memory page slice
+    * @retval:
+    *   a mutable reference slice of 'addr' 's page
     */
     fn get_page_slice_mut<'a, 'b>(&'a mut self, addr: usize) -> &'b mut [u8] {
         use core::slice;
@@ -105,11 +105,11 @@ impl PageTable for ActivePageTable {
     }
 
     /*
-    * @param: 
+    * @param:
     *   addr: virtual address
-    * @brief: 
+    * @brief:
     *   get the address's content
-    * @retval: 
+    * @retval:
     *   the content(u8) of 'addr'
     */
     fn read(&mut self, addr: usize) -> u8 {
@@ -117,9 +117,9 @@ impl PageTable for ActivePageTable {
     }
 
     /*
-    * @param: 
+    * @param:
     *   addr: virtual address
-    * @brief: 
+    * @brief:
     *   write the address's content
     */
     fn write(&mut self, addr: usize, data: u8) {
@@ -205,7 +205,7 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn new_bare() -> Self {
-        let frame = Self::alloc_frame().map(|target| Frame::of_addr(PhysAddr::new(target as u32)))
+        let frame = alloc_frame().map(|target| Frame::of_addr(PhysAddr::new(target as u32)))
             .expect("failed to allocate frame");
         active_table().with_temporary_map(&frame, |_, table: &mut RvPageTable| {
             table.zero();
@@ -260,18 +260,6 @@ impl InactivePageTable for InactivePageTable0 {
     fn token(&self) -> usize {
         self.p2_frame.number() | (1 << 31) // as satp
     }
-
-    fn alloc_frame() -> Option<usize> {
-        alloc_frame()
-    }
-
-    fn dealloc_frame(target: usize) {
-        dealloc_frame(target)
-    }
-
-    fn alloc_stack() -> Stack {
-        alloc_stack()
-    }
 }
 
 impl InactivePageTable0 {
@@ -291,7 +279,7 @@ impl InactivePageTable0 {
 impl Drop for InactivePageTable0 {
     fn drop(&mut self) {
         info!("PageTable dropping: {:?}", self);
-        Self::dealloc_frame(self.p2_frame.start_address().as_u32() as usize);
+        dealloc_frame(self.p2_frame.start_address().as_u32() as usize);
     }
 }
 

@@ -161,7 +161,7 @@ impl InactivePageTable for InactivePageTable0 {
     }
 
     fn new_bare() -> Self {
-        let frame = Self::alloc_frame().map(|target| Frame::of_addr(target))
+        let frame = alloc_frame().map(|target| Frame::of_addr(target))
             .expect("failed to allocate frame");
         active_table().with_temporary_map(&frame, |_, table: &mut x86PageTable| {
             table.zero();
@@ -214,18 +214,6 @@ impl InactivePageTable for InactivePageTable0 {
     fn token(&self) -> usize {
         self.p4_frame.start_address().as_u64() as usize // as CR3
     }
-
-    fn alloc_frame() -> Option<usize> {
-        alloc_frame()
-    }
-
-    fn dealloc_frame(target: usize) {
-        dealloc_frame(target)
-    }
-
-    fn alloc_stack() -> Stack {
-        alloc_stack()
-    }
 }
 
 impl InactivePageTable0 {
@@ -245,7 +233,7 @@ impl InactivePageTable0 {
 impl Drop for InactivePageTable0 {
     fn drop(&mut self) {
         info!("PageTable dropping: {:?}", self);
-        Self::dealloc_frame(self.p4_frame.start_address().as_u64() as usize);
+        dealloc_frame(self.p4_frame.start_address().as_u64() as usize);
     }
 }
 
