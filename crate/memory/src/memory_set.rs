@@ -7,50 +7,6 @@ use core::marker::PhantomData;
 use super::*;
 use paging::*;
 
-/// an inactive page table
-/// Note: InactivePageTable is not a PageTable
-///       but it can be activated and "become" a PageTable
-/// Why this trait is in this file?(seems should in paging/mod.rs)
-pub trait InactivePageTable {
-    /// the active version of page table
-    type Active: PageTable;
-
-    /*
-    **  @brief  create a inactive page table with kernel memory mapped
-    **  @retval InactivePageTable    the created inactive page table
-    */
-    fn new() -> Self;
-    /*
-    **  @brief  create a inactive page table without kernel memory mapped
-    **  @retval InactivePageTable    the created inactive page table
-    */
-    fn new_bare() -> Self;
-    /*
-    **  @brief  temporarily active the page table and edit it
-    **  @retval impl FnOnce(&mut Self::Active)
-    **                               the function of the editing action,
-    **                               which takes a temporarily activated page table as param
-    **  @retval none
-    */
-    fn edit(&mut self, f: impl FnOnce(&mut Self::Active));
-    /*
-    **  @brief  activate the inactive page table
-    **  @retval none
-    */
-    unsafe fn activate(&self);
-    /*
-    **  @brief  execute function with this inactive page table
-    **  @param  f: impl FnOnce()     the function to be executed
-    **  @retval none
-    */
-    unsafe fn with(&self, f: impl FnOnce());
-    /*
-    **  @brief  get the token of the inactive page table
-    **  @retval usize                the token of the inactive page table
-    */
-    fn token(&self) -> usize;
-}
-
 /// Allocte service provided by kernel
 pub trait KernelAllocator{
     /*
